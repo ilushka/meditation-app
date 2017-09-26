@@ -316,12 +316,11 @@ public class TimerView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (isPointOnRing(event.getX(), event.getY())) {
-            Log.i(TAG, "MONKEY: getX(): " + (int)event.getX() + " getY(): " + (int)event.getY() + " getAction(): " + event.getAction());
-
-            Point snapPoint = getNearestPoint((int)event.getX(), (int)event.getY());
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
+        Log.i(TAG, "MONKEY: getX(): " + (int)event.getX() + " getY(): " + (int)event.getY() + " getAction(): " + event.getAction());
+        Point snapPoint = getNearestPoint((int)event.getX(), (int)event.getY());
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                if (isPointOnRing(event.getX(), event.getY())) {
                     // find out if user touching existing point
                     mPendingPoint = findTimerPointByPoint(snapPoint);
                     if (mPendingPoint == null) {
@@ -330,33 +329,25 @@ public class TimerView extends View {
                         // existing point is getting moved
                         mTimerPoints.remove(mPendingPoint);
                     }
-                    break;
-                case MotionEvent.ACTION_MOVE:
-                    if (mPendingPoint != null) {
-                        mPendingPoint.setPoint(snapPoint);
-                    }
-                    break;
-                case MotionEvent.ACTION_UP:
-                    if (mPendingPoint != null) {
-                        mTimerPoints.add(mPendingPoint);
-                        mPendingPoint = null;
-                    }
-                    break;
-            }
-            //drawDebugLineBetweenCenterAndTouch(event.getX(), event.getY());
-            //drawDebugLinearEquation(event.getX(), event.getY());
-            invalidate();
-        } else {
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_UP:
-                    // user lifted finger from screen outside of ring - add pending timer point to the list
-                    if (mPendingPoint != null) {
-                        mTimerPoints.add(mPendingPoint);
-                        mPendingPoint = null;
-                    }
-                    break;
-            }
+                }
+                invalidate();
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (mPendingPoint != null) {
+                    mPendingPoint.setPoint(snapPoint);
+                }
+                invalidate();
+                break;
+            case MotionEvent.ACTION_UP:
+                if (mPendingPoint != null) {
+                    mTimerPoints.add(mPendingPoint);
+                    mPendingPoint = null;
+                }
+                invalidate();
+                break;
         }
+        //drawDebugLineBetweenCenterAndTouch(event.getX(), event.getY());
+        //drawDebugLinearEquation(event.getX(), event.getY());
         return true;
     }
 
