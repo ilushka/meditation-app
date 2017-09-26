@@ -25,6 +25,7 @@ public class TimerView extends View {
     private Rect mViewRect;
     private float mRingX, mRingY, mRingRadius, mRingWidth;
     private ArrayList<TimerPoint> mTimerPoints;
+    private TimerPoint mPendingPoint = null;
 
     private Paint mDebugPaint;
     private Point mDebugLineP0 = null, mDebugLineP1 = null;
@@ -33,13 +34,37 @@ public class TimerView extends View {
         public float x, y, radius;
         public Paint paint;
 
-        public TimerPoint(float x, float y) {
-            this.x = x;
-            this.y = y;
+        public TimerPoint(Point point) {
+            this.x = point.x;
+            this.y = point.y;
             radius = 100;
             paint = new Paint();
             paint.setColor(Color.GREEN);
             paint.setStyle(Paint.Style.FILL);
+        }
+
+        public void setPoint(Point point) {
+            this.x = point.x;
+            this.y = point.y;
+        }
+
+        public float getX() {
+            return x;
+        }
+
+        public float getY() {
+            return y;
+        }
+
+        public float getRadius() {
+            return radius;
+        }
+
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            return false;
         }
     }
 
@@ -185,12 +210,18 @@ public class TimerView extends View {
         for (TimerPoint tp : mTimerPoints) {
             canvas.drawCircle(tp.x, tp.y, tp.radius, tp.paint);
         }
+        if (mPendingPoint != null) {
+            canvas.drawCircle(mPendingPoint.x, mPendingPoint.y, mPendingPoint.radius, mPendingPoint.paint);
+        }
 
+        /*
         if (mDebugLineP0 != null && mDebugLineP1 != null) {
             canvas.drawLine(mDebugLineP0.x, mDebugLineP0.y, mDebugLineP1.x, mDebugLineP1.y, mDebugPaint);
         }
+        */
     }
 
+    /*
     private void drawDebugLineBetweenCenterAndTouch(float x, float y) {
         mDebugLineP0 = new Point((int)x, (int)y);
         mDebugLineP1 = new Point((int)mRingX, (int)mRingY);
@@ -199,13 +230,13 @@ public class TimerView extends View {
     private void drawDebugLinearEquation(float x, float y) {
         float m = (mRingY - y) / (mRingX - x);
         float b = y - (m * x);
-        Log.i(TAG, "MONKEY: m: " + m + " b: " + b);
         if (m < 0) {
             mDebugLineP0 = new Point((int) 0, (int) b);
             mDebugLineP1 = new Point((int) ((0 - b) / m), (int) 0);
         } else {
         }
     }
+    */
 
     private Point getNearestPoint(int x, int y) {
         int intersectionX, intersectionY;
@@ -215,7 +246,6 @@ public class TimerView extends View {
             float A = 1;
             float B = -2 * mRingY;
             float C = (float)(Math.pow(mRingY, 2) - Math.pow(mRingRadius, 2));
-            Log.i(TAG, "MONKEY: A: " + A + " B: " + B + " C: " + C);
             if (y < mRingY) {
                 intersectionX = (int)x;
                 intersectionY = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
@@ -240,12 +270,10 @@ public class TimerView extends View {
         } else {
             float m = (y - mRingY) / (x - mRingX);
             float b = mRingY - (mRingX * m);
-            Log.i(TAG, "MONKEY: m: " + m + " b: " + b);
             // https://math.stackexchange.com/questions/228841/how-do-i-calculate-the-intersections-of-a-straight-line-and-a-circle
             float A = (float) (Math.pow(m, 2) + 1);
             float B = (float) (2 * ((m * b) - (m * mRingY) - mRingX));
             float C = (float) (Math.pow(mRingY, 2) - Math.pow(mRingRadius, 2) + Math.pow(mRingX, 2) - (2 * b * mRingY) + Math.pow(b, 2));
-            Log.i(TAG, "MONKEY: A: " + A + " B: " + B + " C: " + C);
             if (x < mRingX) {
                 intersectionX = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
                 intersectionY = (int) ((m * ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A))) + b);
@@ -269,17 +297,65 @@ public class TimerView extends View {
         return false;
     }
 
+    private boolean isPointInTimerPoint(float x, float y, TimerPoint point) {
+        double temp = Math.pow((x - point.getX()), 2) + Math.pow(y - point.getY(), 2);
+        if (temp < Math.pow(point.radius, 2)) {
+            return true;
+        }
+        return false;
+    }
+
+    private TimerPoint findTimerPointByPoint(Point point) {
+        for (TimerPoint tp : mTimerPoints) {
+            if (isPointInTimerPoint(point.x, point.y, tp)) {
+                return tp;
+            }
+        }
+        return null;
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (isPointOnRing(event.getX(), event.getY())) {
-            Log.i(TAG, "MONKEY: getX(): " + (int)event.getX() + " getY(): " + (int)event.getY());
+            Log.i(TAG, "MONKEY: getX(): " + (int)event.getX() + " getY(): " + (int)event.getY() + " getAction(): " + event.getAction());
 
-            Point point = getNearestPoint((int)event.getX(), (int)event.getY());
-            Log.i(TAG, "MONKEY: point.x: " + point.x + " point.y: " + point.y);
-            mTimerPoints.add(new TimerPoint(point.x, point.y));
+            Point snapPoint = getNearestPoint((int)event.getX(), (int)event.getY());
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    // find out if user touching existing point
+                    mPendingPoint = findTimerPointByPoint(snapPoint);
+                    if (mPendingPoint == null) {
+                        mPendingPoint = new TimerPoint(snapPoint);
+                    } else {
+                        // existing point is getting moved
+                        mTimerPoints.remove(mPendingPoint);
+                    }
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (mPendingPoint != null) {
+                        mPendingPoint.setPoint(snapPoint);
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                    if (mPendingPoint != null) {
+                        mTimerPoints.add(mPendingPoint);
+                        mPendingPoint = null;
+                    }
+                    break;
+            }
             //drawDebugLineBetweenCenterAndTouch(event.getX(), event.getY());
             //drawDebugLinearEquation(event.getX(), event.getY());
             invalidate();
+        } else {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_UP:
+                    // user lifted finger from screen outside of ring - add pending timer point to the list
+                    if (mPendingPoint != null) {
+                        mTimerPoints.add(mPendingPoint);
+                        mPendingPoint = null;
+                    }
+                    break;
+            }
         }
         return true;
     }
