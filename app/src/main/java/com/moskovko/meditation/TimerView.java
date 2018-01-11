@@ -7,7 +7,6 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -20,44 +19,44 @@ import java.util.ArrayList;
 public class TimerView extends View {
     private static final String TAG = "TimerView";
 
+    private static final int MARK_WIDTH = 50;
+    private static final int MARK_HEIGHT = 200;
+
     private Paint mBarBackgroundPaint;
     private Paint mRingColor;
     private Rect mViewRect;
     private float mRingX, mRingY, mRingRadius, mRingWidth;
-    private ArrayList<TimerPoint> mTimerPoints;
-    private TimerPoint mPendingPoint = null;
+    private ArrayList<TimerMark> mTimerMarks;
+    private TimerMark mPendingMark = null;
 
     private Paint mDebugPaint;
-    private Point mDebugLineP0 = null, mDebugLineP1 = null;
+    private ArrayList<Float> mDebugLines;
 
-    private class TimerPoint {
-        public float x, y, radius;
+    private class TimerMark {
+        public float degrees, radius;
+        public Rect rect;
+        public Point center;
         public Paint paint;
 
-        public TimerPoint(Point point) {
-            this.x = point.x;
-            this.y = point.y;
-            radius = 100;
-            paint = new Paint();
-            paint.setColor(Color.GREEN);
-            paint.setStyle(Paint.Style.FILL);
+        private int height, width;
+
+        public TimerMark(Point center, int height, int width) {
+            this.center = new Point(center);
+            this.degrees = 0 - (float)Math.toDegrees(Math.atan(((0 - mRingY) - (0 - center.y)) / (mRingX - center.x)));
+            this.rect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
+            this.height = height;
+            this.width = width;
+            this.radius = height / 2;
+
+            this.paint = new Paint();
+            this.paint.setColor(Color.GREEN);
+            this.paint.setStyle(Paint.Style.FILL);
         }
 
-        public void setPoint(Point point) {
-            this.x = point.x;
-            this.y = point.y;
-        }
-
-        public float getX() {
-            return x;
-        }
-
-        public float getY() {
-            return y;
-        }
-
-        public float getRadius() {
-            return radius;
+        public void setPoint(Point newCenter) {
+            this.center = new Point(newCenter);
+            this.rect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
+            this.degrees = 0 - (float)Math.toDegrees(Math.atan(((0 - mRingY) - (0 - newCenter.y)) / (mRingX - newCenter.x)));
         }
 
         public boolean equals(Object obj) {
@@ -119,11 +118,11 @@ public class TimerView extends View {
         mBarBackgroundPaint.setColor(Color.BLUE);
         mBarBackgroundPaint.setStyle(Paint.Style.FILL);
 
-        // MONKEY:
         mDebugPaint = new Paint();
         mDebugPaint.setColor(Color.CYAN);
         mDebugPaint.setStyle(Paint.Style.STROKE);
         mDebugPaint.setStrokeWidth(5);
+        mDebugLines = new ArrayList<Float>();
 
         /*
         mBarForegroundPaint = new Paint();
@@ -144,7 +143,7 @@ public class TimerView extends View {
         mText = mScaledValue + mTexUnit;
         */
 
-        mTimerPoints = new ArrayList<TimerPoint>();
+        mTimerMarks = new ArrayList<TimerMark>();
     }
 
     /*
@@ -190,16 +189,6 @@ public class TimerView extends View {
         int height = MeasureSpec.getSize(heightMeasureSpec);
         mViewRect = new Rect(0, 0, width, height);
 
-        /*
-        // get center coordinates of percentage text
-        mTextX = mBackgroundBarRect.width() / 2;
-        // offset by height of text bounds to center it on y axis
-        Rect textBounds = new Rect();
-        String text = FULL_CHARGE_STR;
-        mBackgroundTextPaint.getTextBounds(text, 0, text.length(), textBounds);
-        mTextY = (mBackgroundBarRect.height() / 2) + (textBounds.height() / 2);
-        */
-
         setMeasuredDimension(mViewRect.width(), mViewRect.height());
     }
 
@@ -207,40 +196,71 @@ public class TimerView extends View {
     protected void onDraw(Canvas canvas) {
         canvas.drawRect(mViewRect, mBarBackgroundPaint);
         canvas.drawCircle(mRingX, mRingY, mRingRadius, mRingColor);
-        for (TimerPoint tp : mTimerPoints) {
-            canvas.drawCircle(tp.x, tp.y, tp.radius, tp.paint);
+        for (TimerMark tp : mTimerMarks) {
+            canvas.save(Canvas.MATRIX_SAVE_FLAG);
+            canvas.rotate(tp.degrees, tp.center.x, tp.center.y);
+            canvas.drawRect(tp.rect, tp.paint);
+            canvas.restore();
         }
-        if (mPendingPoint != null) {
-            canvas.drawCircle(mPendingPoint.x, mPendingPoint.y, mPendingPoint.radius, mPendingPoint.paint);
+        if (mPendingMark != null) {
+            canvas.save(Canvas.MATRIX_SAVE_FLAG);
+            canvas.rotate(mPendingMark.degrees, mPendingMark.center.x, mPendingMark.center.y);
+            canvas.drawRect(mPendingMark.rect, mPendingMark.paint);
+            canvas.restore();
         }
 
-        /*
-        if (mDebugLineP0 != null && mDebugLineP1 != null) {
-            canvas.drawLine(mDebugLineP0.x, mDebugLineP0.y, mDebugLineP1.x, mDebugLineP1.y, mDebugPaint);
+        /* MONKEY:
+        if (!mDebugLines.isEmpty()) {
+            // ned to get array of primitives (float)
+            float[] points = new float[mDebugLines.size()];
+            Iterator<Float> itr = mDebugLines.iterator();
+            for (int ii = 0; ii < points.length; ++ii) {
+                points[ii] = itr.next().floatValue();
+            }
+            mDebugLines.clear();
+            canvas.drawLines(points, mDebugPaint);
         }
         */
     }
 
-    /*
+    // MONKEY:
     private void drawDebugLineBetweenCenterAndTouch(float x, float y) {
-        mDebugLineP0 = new Point((int)x, (int)y);
-        mDebugLineP1 = new Point((int)mRingX, (int)mRingY);
+        mDebugLines.add(x);
+        mDebugLines.add(y);
+        mDebugLines.add(mRingX);
+        mDebugLines.add(mRingY);
     }
 
-    private void drawDebugLinearEquation(float x, float y) {
-        float m = (mRingY - y) / (mRingX - x);
-        float b = y - (m * x);
-        if (m < 0) {
-            mDebugLineP0 = new Point((int) 0, (int) b);
-            mDebugLineP1 = new Point((int) ((0 - b) / m), (int) 0);
+    // MONKEY:
+    private void drawDebugPerpendicularLineAtPoint(float x1, float y1, float x2, float y2, float px, float py) {
+        float m = ((-1 * y2) - (-1 * y1)) / (x2 - x1);
+        float b = (-1 * y1) - (m * x1);
+
+        // https://math.stackexchange.com/questions/175896/finding-a-point-along-a-line-a-certain-distance-away-from-another-point
+        float d = 1;
+        float v1 = (x2 - x1);
+        float v2 = ((-1 * y2) - (-1 * y1));
+        px = x1 + (float)(d * (v1 / Math.sqrt(Math.pow(v1, 2) + Math.pow(v2, 2))));
+        py = -1 * (float)((-1 * y1) * (d * (v2 / Math.sqrt(Math.pow(v1, 2) + Math.pow(v2, 2)))));
+
+        float m_perp = (-1 / m);
+        float b_perp = (-1 * py) - (m_perp * px);
+        if (m_perp > 0) {
+            mDebugLines.add(0f);
+            mDebugLines.add(b_perp * -1);
+            mDebugLines.add((0 - b_perp) / m_perp);
+            mDebugLines.add(0f);
         } else {
+            mDebugLines.add(0f);
+            mDebugLines.add(b_perp * -1);
+            mDebugLines.add((-1000 - b_perp) / m_perp);
+            mDebugLines.add(1000f);
         }
     }
-    */
 
-    private Point getNearestPoint(int x, int y) {
+    private Point getNearestPointOnRing(int x, int y) {
         int intersectionX, intersectionY;
-        // linear equation of line between (x, y) and circles center
+        // linear equation of line between (mCenterX, y) and circles center
         if (mRingX == x) {
             // vertical line
             float A = 1;
@@ -258,7 +278,6 @@ public class TimerView extends View {
             float A = 1;
             float B = -2 * mRingY;
             float C = (float)(Math.pow(mRingX, 2) - Math.pow(mRingRadius, 2));
-            Log.i(TAG, "MONKEY: A: " + A + " B: " + B + " C: " + C);
             if (x < mRingX) {
                 intersectionX = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
                 intersectionY = (int)y;
@@ -297,17 +316,17 @@ public class TimerView extends View {
         return false;
     }
 
-    private boolean isPointInTimerPoint(float x, float y, TimerPoint point) {
-        double temp = Math.pow((x - point.getX()), 2) + Math.pow(y - point.getY(), 2);
-        if (temp < Math.pow(point.radius, 2)) {
+    private boolean isPointInTimerMark(float x, float y, TimerMark mark) {
+        double temp = Math.pow((x - mark.center.x), 2) + Math.pow(y - mark.center.y, 2);
+        if (temp < Math.pow(mark.radius, 2)) {
             return true;
         }
         return false;
     }
 
-    private TimerPoint findTimerPointByPoint(Point point) {
-        for (TimerPoint tp : mTimerPoints) {
-            if (isPointInTimerPoint(point.x, point.y, tp)) {
+    private TimerMark findTimerMarkNearPoint(Point point) {
+        for (TimerMark tp : mTimerMarks) {
+            if (isPointInTimerMark(point.x, point.y, tp)) {
                 return tp;
             }
         }
@@ -316,43 +335,48 @@ public class TimerView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        Log.i(TAG, "MONKEY: getX(): " + (int)event.getX() + " getY(): " + (int)event.getY() + " getAction(): " + event.getAction());
-        Point snapPoint = getNearestPoint((int)event.getX(), (int)event.getY());
+        Point snapPoint = getNearestPointOnRing((int)event.getX(), (int)event.getY());
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (isPointOnRing(event.getX(), event.getY())) {
                     // find out if user touching existing point
-                    mPendingPoint = findTimerPointByPoint(snapPoint);
-                    if (mPendingPoint == null) {
-                        mPendingPoint = new TimerPoint(snapPoint);
+                    mPendingMark = findTimerMarkNearPoint(snapPoint);
+                    if (mPendingMark == null) {
+                        mPendingMark = new TimerMark(snapPoint, MARK_WIDTH, MARK_HEIGHT);
                     } else {
                         // existing point is getting moved
-                        mTimerPoints.remove(mPendingPoint);
+                        mTimerMarks.remove(mPendingMark);
                     }
                 }
                 invalidate();
                 break;
             case MotionEvent.ACTION_MOVE:
-                if (mPendingPoint != null) {
-                    mPendingPoint.setPoint(snapPoint);
+                if (mPendingMark != null) {
+                    mPendingMark.setPoint(snapPoint);
                 }
                 invalidate();
                 break;
             case MotionEvent.ACTION_UP:
-                if (mPendingPoint != null) {
-                    mTimerPoints.add(mPendingPoint);
-                    mPendingPoint = null;
+                if (mPendingMark != null) {
+                    mTimerMarks.add(mPendingMark);
+                    mPendingMark = null;
                 }
                 invalidate();
                 break;
         }
-        //drawDebugLineBetweenCenterAndTouch(event.getX(), event.getY());
-        //drawDebugLinearEquation(event.getX(), event.getY());
+
+        // debug
+        /*
+        drawDebugLineBetweenCenterAndTouch(event.getX(), event.getY());
+        if (mPendingMark != null) {
+            drawDebugPerpendicularLineAtPoint(mPendingMark.getmCenterX(), mPendingMark.getY(), mRingX, mRingY, mPendingMark.getmCenterX(), mPendingMark.getY());
+        }
+        */
         return true;
     }
 
     public void clearTimerPoints() {
-        mTimerPoints.clear();
+        mTimerMarks.clear();
         invalidate();
     }
 }
