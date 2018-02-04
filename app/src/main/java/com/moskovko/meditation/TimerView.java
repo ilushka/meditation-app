@@ -22,16 +22,15 @@ public class TimerView extends View {
 
     private static final int MARK_WIDTH = 100;
     private static final int MARK_HEIGHT = 200;
+    private static final int TEXT_SIZE = 150;
 
     private Paint mBarBackgroundPaint;
     private Paint mRingColor;
+    private Paint mTextPaint;
     private Rect mViewRect;
     private float mRingX, mRingY, mRingRadius, mRingWidth;
     private ArrayList<TimerMark> mTimerMarks;
     private TimerMark mPendingMark = null;
-
-    private Paint mDebugPaint;
-    private ArrayList<Float> mDebugLines;
 
     private class TimerMark {
         public float degrees, radius;
@@ -60,8 +59,13 @@ public class TimerView extends View {
             this.degrees = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - newCenter.y)), (mRingX - newCenter.x)));
         }
 
-        public float getArc() {
-            return (float)(float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
+        public float getPositionPercentage() {
+            double degrees = Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
+            if (degrees < 0 && degrees > -180) {
+                return (float)(Math.abs(degrees) / 360);
+            } else {
+                return (float)((Math.abs(180 - degrees) / 360) + 0.50);
+            }
         }
 
         public boolean equals(Object obj) {
@@ -123,11 +127,10 @@ public class TimerView extends View {
         mBarBackgroundPaint.setColor(Color.BLUE);
         mBarBackgroundPaint.setStyle(Paint.Style.FILL);
 
-        mDebugPaint = new Paint();
-        mDebugPaint.setColor(Color.CYAN);
-        mDebugPaint.setStyle(Paint.Style.STROKE);
-        mDebugPaint.setStrokeWidth(5);
-        mDebugLines = new ArrayList<Float>();
+        mTextPaint = new Paint();
+        mTextPaint.setColor(Color.WHITE);
+        mTextPaint.setStyle(Paint.Style.FILL);
+        mTextPaint.setTextSize(TEXT_SIZE);
 
         /*
         mBarForegroundPaint = new Paint();
@@ -197,6 +200,8 @@ public class TimerView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        // TODO: don't do any calculations here!!!!
+
         canvas.drawRect(mViewRect, mBarBackgroundPaint);
 
         canvas.save();
@@ -217,58 +222,12 @@ public class TimerView extends View {
             canvas.rotate(mPendingMark.degrees, mPendingMark.center.x, mPendingMark.center.y);
             canvas.drawRect(mPendingMark.rect, mPendingMark.paint);
             canvas.restore();
-            Log.d("MONKEY", "arc: " + mPendingMark.getArc());
+            // draw center text
+            String text =  Integer.toString(Math.round(mPendingMark.getPositionPercentage() * 100));
+            canvas.drawText(text, 0, text.length(), (0 - (TEXT_SIZE / 2)), 0, mTextPaint);
         }
 
         canvas.restore();
-
-        /* MONKEY:
-        if (!mDebugLines.isEmpty()) {
-            // ned to get array of primitives (float)
-            float[] points = new float[mDebugLines.size()];
-            Iterator<Float> itr = mDebugLines.iterator();
-            for (int ii = 0; ii < points.length; ++ii) {
-                points[ii] = itr.next().floatValue();
-            }
-            mDebugLines.clear();
-            canvas.drawLines(points, mDebugPaint);
-        }
-        */
-    }
-
-    // MONKEY:
-    private void drawDebugLineBetweenCenterAndTouch(float x, float y) {
-        mDebugLines.add(x);
-        mDebugLines.add(y);
-        mDebugLines.add(mRingX);
-        mDebugLines.add(mRingY);
-    }
-
-    // MONKEY:
-    private void drawDebugPerpendicularLineAtPoint(float x1, float y1, float x2, float y2, float px, float py) {
-        float m = ((-1 * y2) - (-1 * y1)) / (x2 - x1);
-        float b = (-1 * y1) - (m * x1);
-
-        // https://math.stackexchange.com/questions/175896/finding-a-point-along-a-line-a-certain-distance-away-from-another-point
-        float d = 1;
-        float v1 = (x2 - x1);
-        float v2 = ((-1 * y2) - (-1 * y1));
-        px = x1 + (float)(d * (v1 / Math.sqrt(Math.pow(v1, 2) + Math.pow(v2, 2))));
-        py = -1 * (float)((-1 * y1) * (d * (v2 / Math.sqrt(Math.pow(v1, 2) + Math.pow(v2, 2)))));
-
-        float m_perp = (-1 / m);
-        float b_perp = (-1 * py) - (m_perp * px);
-        if (m_perp > 0) {
-            mDebugLines.add(0f);
-            mDebugLines.add(b_perp * -1);
-            mDebugLines.add((0 - b_perp) / m_perp);
-            mDebugLines.add(0f);
-        } else {
-            mDebugLines.add(0f);
-            mDebugLines.add(b_perp * -1);
-            mDebugLines.add((-1000 - b_perp) / m_perp);
-            mDebugLines.add(1000f);
-        }
     }
 
     private Point getNearestPointOnRing(int x, int y) {
@@ -365,14 +324,6 @@ public class TimerView extends View {
                 invalidate();
                 break;
         }
-
-        // debug
-        /*
-        drawDebugLineBetweenCenterAndTouch(event.getX(), event.getY());
-        if (mPendingMark != null) {
-            drawDebugPerpendicularLineAtPoint(mPendingMark.getmCenterX(), mPendingMark.getY(), mRingX, mRingY, mPendingMark.getmCenterX(), mPendingMark.getY());
-        }
-        */
         return true;
     }
 
