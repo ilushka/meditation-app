@@ -7,6 +7,7 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -19,7 +20,7 @@ import java.util.ArrayList;
 public class TimerView extends View {
     private static final String TAG = "TimerView";
 
-    private static final int MARK_WIDTH = 50;
+    private static final int MARK_WIDTH = 100;
     private static final int MARK_HEIGHT = 200;
 
     private Paint mBarBackgroundPaint;
@@ -42,7 +43,7 @@ public class TimerView extends View {
 
         public TimerMark(Point center, int height, int width) {
             this.center = new Point(center);
-            this.degrees = 0 - (float)Math.toDegrees(Math.atan(((0 - mRingY) - (0 - center.y)) / (mRingX - center.x)));
+            this.degrees = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
             this.rect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
             this.height = height;
             this.width = width;
@@ -56,7 +57,11 @@ public class TimerView extends View {
         public void setPoint(Point newCenter) {
             this.center = new Point(newCenter);
             this.rect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
-            this.degrees = 0 - (float)Math.toDegrees(Math.atan(((0 - mRingY) - (0 - newCenter.y)) / (mRingX - newCenter.x)));
+            this.degrees = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - newCenter.y)), (mRingX - newCenter.x)));
+        }
+
+        public float getArc() {
+            return (float)(float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
         }
 
         public boolean equals(Object obj) {
@@ -70,8 +75,8 @@ public class TimerView extends View {
     public TimerView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        mRingX = 500;
-        mRingY = 500;
+        mRingX = 0;
+        mRingY = 0;
         mRingRadius = 300;
         mRingWidth = 150;
 
@@ -184,30 +189,38 @@ public class TimerView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
         mViewRect = new Rect(0, 0, width, height);
-
         setMeasuredDimension(mViewRect.width(), mViewRect.height());
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         canvas.drawRect(mViewRect, mBarBackgroundPaint);
+
+        canvas.save();
+
+        // draw main ring
+        canvas.translate(mViewRect.centerX(), mViewRect.centerY());
         canvas.drawCircle(mRingX, mRingY, mRingRadius, mRingColor);
+        // draw already placed marks
         for (TimerMark tp : mTimerMarks) {
             canvas.save(Canvas.MATRIX_SAVE_FLAG);
             canvas.rotate(tp.degrees, tp.center.x, tp.center.y);
             canvas.drawRect(tp.rect, tp.paint);
             canvas.restore();
         }
+        // draw currently dragged mark
         if (mPendingMark != null) {
             canvas.save(Canvas.MATRIX_SAVE_FLAG);
             canvas.rotate(mPendingMark.degrees, mPendingMark.center.x, mPendingMark.center.y);
             canvas.drawRect(mPendingMark.rect, mPendingMark.paint);
             canvas.restore();
+            Log.d("MONKEY", "arc: " + mPendingMark.getArc());
         }
+
+        canvas.restore();
 
         /* MONKEY:
         if (!mDebugLines.isEmpty()) {
@@ -260,32 +273,18 @@ public class TimerView extends View {
 
     private Point getNearestPointOnRing(int x, int y) {
         int intersectionX, intersectionY;
-        // linear equation of line between (mCenterX, y) and circles center
-        if (mRingX == x) {
+        if (x == 0) {
             // vertical line
             float A = 1;
             float B = -2 * mRingY;
             float C = (float)(Math.pow(mRingY, 2) - Math.pow(mRingRadius, 2));
             if (y < mRingY) {
-                intersectionX = (int)x;
+                intersectionX = x;
                 intersectionY = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
             } else {
-                intersectionX = (int)x;
+                intersectionX = x;
                 intersectionY = (int) ((-B + Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
             }
-        } else if (mRingY == y) {
-            // horizontal line
-            float A = 1;
-            float B = -2 * mRingY;
-            float C = (float)(Math.pow(mRingX, 2) - Math.pow(mRingRadius, 2));
-            if (x < mRingX) {
-                intersectionX = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
-                intersectionY = (int)y;
-            } else {
-                intersectionX = (int) ((-B + Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
-                intersectionY = (int)y;
-            }
-
         } else {
             float m = (y - mRingY) / (x - mRingX);
             float b = mRingY - (mRingX * m);
@@ -335,10 +334,12 @@ public class TimerView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        Point snapPoint = getNearestPointOnRing((int)event.getX(), (int)event.getY());
+        int transX = (int)(event.getX() - mViewRect.centerX());
+        int transY = (int)(event.getY() - mViewRect.centerY());
+        Point snapPoint = getNearestPointOnRing(transX, transY);
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
-                if (isPointOnRing(event.getX(), event.getY())) {
+                if (isPointOnRing(transX, transY)) {
                     // find out if user touching existing point
                     mPendingMark = findTimerMarkNearPoint(snapPoint);
                     if (mPendingMark == null) {
