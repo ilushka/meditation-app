@@ -61,10 +61,14 @@ public class TimerView extends View {
 
         public float getPositionPercentage() {
             double degrees = Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
-            if (degrees < 0 && degrees > -180) {
-                return (float)(Math.abs(degrees) / 360);
+            if (degrees <= -90 && degrees >= -180) {
+                return (float)((Math.abs(degrees) - 90) / 360);
+            } else if (degrees <= 180 && degrees >= 90) {
+                return (float)(((180 - degrees) / 360) + 0.25);
+            } else if (degrees < 90 && degrees >= 0) {
+                return (float)(((90 - degrees) / 360) + 0.50);
             } else {
-                return (float)((Math.abs(180 - degrees) / 360) + 0.50);
+                return (float)(((Math.abs(degrees)) / 360) + 0.75);
             }
         }
 
