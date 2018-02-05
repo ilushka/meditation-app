@@ -31,12 +31,8 @@ public class TimerView extends View {
     private static final int TIMER_INTERVAL     = 50;
 
     private Paint mBarBackgroundPaint;
-    private Paint mRingColor;
     private Paint mTextPaint;
-    private Paint mArcPaint;
     private Rect mViewRect;
-    private RectF mRingRect;
-    private float mRingX, mRingY, mRingRadius, mRingWidth;
     private ArrayList<TimerMark> mTimerMarks;
     private TimerMark mPendingMark = null;
     private Timer mTimer;
@@ -44,6 +40,7 @@ public class TimerView extends View {
     private boolean mIsRunning;
     private float mStartAngle, mSweepAngle;
     private float mCurrentMs, mFinalMs;
+    private TimerRing mTimerRing;
 
     private class TimeMarkComparator implements Comparator<TimerMark> {
         public int compare(TimerMark a, TimerMark b) {
@@ -78,13 +75,13 @@ public class TimerView extends View {
         public void setCenterPoint(Point newCenter) {
             this.mCenter = new Point(newCenter);
             this.mRect = new Rect(mCenter.x - (mWidth / 2), mCenter.y - (mHeight / 2), mCenter.x + (mWidth / 2), mCenter.y + (mHeight / 2));
-            this.mAngle = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - newCenter.y)), (mRingX - newCenter.x)));
+            this.mAngle = 0 - (float)Math.toDegrees(Math.atan2(((0 - TimerRing.RING_CENTER_Y) - (0 - newCenter.y)), (TimerRing.RING_CENTER_X - newCenter.x)));
             setArcPosition();
         }
 
         private void setArcPosition() {
-            double degrees = Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - mCenter.y)),
-                                        (mRingX - mCenter.x)));
+            double degrees = Math.toDegrees(Math.atan2(((0 - TimerRing.RING_CENTER_Y) - (0 - mCenter.y)),
+                                        (TimerRing.RING_CENTER_X - mCenter.x)));
             if (degrees <= -90 && degrees >= -180) {
                 this.mArcPosition = (float)((Math.abs(degrees) - 90) / 360);
             } else if (degrees <= 180 && degrees >= 90) {
@@ -112,18 +109,36 @@ public class TimerView extends View {
         }
     }
 
+    private class TimerRing {
+        public static final float RING_CENTER_X         = 0;
+        public static final float RING_CENTER_Y         = 0;
+        public static final float RING_RADIUS           = 300;
+        public static final float RING_STROKE_WIDTH     = 150;
+
+        private Paint mRingPaint;
+        private Paint mArcPaint;
+        private RectF mRect;
+
+        public TimerRing(RectF rect) {
+            this.mRect = rect;
+            this.mArcPaint = new Paint();
+            this.mArcPaint.setColor(Color.BLUE);
+            this.mArcPaint.setStyle(Paint.Style.STROKE);
+            this.mArcPaint.setStrokeWidth(RING_STROKE_WIDTH + 5);
+            this.mRingPaint = new Paint();
+            this.mRingPaint.setColor(Color.RED);
+            this.mRingPaint.setStyle(Paint.Style.STROKE);
+            this.mRingPaint.setStrokeWidth(TimerRing.RING_STROKE_WIDTH);
+        }
+
+        public RectF getRect()      { return this.mRect; }
+        public Paint getArcPaint()  { return this.mArcPaint; }
+        public Paint getRingPaint() { return this.mRingPaint; }
+    }
+
     public TimerView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        mRingX = 0;
-        mRingY = 0;
-        mRingRadius = 300;
-        mRingWidth = 150;
-        mRingRect = new RectF((0 - (mRingRadius)), (0 - (mRingRadius)), mRingRadius, mRingRadius);
-        mStartAngle = 0;
-        mSweepAngle = 0;
-        mCurrentMs = 0;
-        mFinalMs = 60000;
 
 
         /*
@@ -158,11 +173,6 @@ public class TimerView extends View {
         }
         */
 
-        // mPaint
-        mRingColor = new Paint();
-        mRingColor.setColor(Color.RED);
-        mRingColor.setStyle(Paint.Style.STROKE);
-        mRingColor.setStrokeWidth(mRingWidth);
 
         mBarBackgroundPaint = new Paint();
         mBarBackgroundPaint.setColor(Color.BLUE);
@@ -173,10 +183,12 @@ public class TimerView extends View {
         mTextPaint.setStyle(Paint.Style.FILL);
         mTextPaint.setTextSize(TEXT_SIZE);
 
-        mArcPaint = new Paint();
-        mArcPaint.setColor(Color.BLUE);
-        mArcPaint.setStyle(Paint.Style.STROKE);
-        mArcPaint.setStrokeWidth(mRingWidth + 5);
+        RectF ringRect = new RectF((0 - (TimerRing.RING_RADIUS)), (0 - (TimerRing.RING_RADIUS)), TimerRing.RING_RADIUS, TimerRing.RING_RADIUS);
+        mTimerRing = new TimerRing(ringRect);
+        mStartAngle = 0;
+        mSweepAngle = 0;
+        mCurrentMs = 0;
+        mFinalMs = 60000;
 
         /*
         mBarForegroundPaint = new Paint();
@@ -279,9 +291,11 @@ public class TimerView extends View {
         canvas.save();
         canvas.rotate(-90, 0, 0);
         // draw main ring
-        canvas.drawCircle(mRingX, mRingY, mRingRadius, mRingColor);
+        canvas.drawCircle(TimerRing.RING_CENTER_X, TimerRing.RING_CENTER_Y, TimerRing.RING_RADIUS,
+                                mTimerRing.getRingPaint());
         // draw arc mask
-        canvas.drawArc(mRingRect, mStartAngle, mSweepAngle, false, mArcPaint);
+        canvas.drawArc(mTimerRing.getRect(), mStartAngle, mSweepAngle, false,
+                            mTimerRing.getArcPaint());
         canvas.restore();
 
         // draw already placed marks
@@ -311,9 +325,10 @@ public class TimerView extends View {
         if (x == 0) {
             // vertical line
             float A = 1;
-            float B = -2 * mRingY;
-            float C = (float)(Math.pow(mRingY, 2) - Math.pow(mRingRadius, 2));
-            if (y < mRingY) {
+            float B = -2 * TimerRing.RING_CENTER_Y;
+            float C = (float)(Math.pow(TimerRing.RING_CENTER_Y, 2) -
+                                    Math.pow(TimerRing.RING_RADIUS, 2));
+            if (y < TimerRing.RING_CENTER_Y) {
                 intersectionX = x;
                 intersectionY = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
             } else {
@@ -321,14 +336,14 @@ public class TimerView extends View {
                 intersectionY = (int) ((-B + Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
             }
         } else {
-            float m = (y - mRingY) / (x - mRingX);
-            float b = mRingY - (mRingX * m);
+            float m = (y - TimerRing.RING_CENTER_Y) / (x - TimerRing.RING_CENTER_X);
+            float b = TimerRing.RING_CENTER_Y - (TimerRing.RING_CENTER_X * m);
             // https://math.stackexchange.com/questions/228841/how-do-i-calculate-the-intersections-of-a-straight-line-and-a-circle
             float A = (float) (Math.pow(m, 2) + 1);
-            float B = (float) (2 * ((m * b) - (m * mRingY) - mRingX));
-            float C = (float) (Math.pow(mRingY, 2) - Math.pow(mRingRadius, 2) +
-                    Math.pow(mRingX, 2) - (2 * b * mRingY) + Math.pow(b, 2));
-            if (x < mRingX) {
+            float B = (float) (2 * ((m * b) - (m * TimerRing.RING_CENTER_Y) - TimerRing.RING_CENTER_X));
+            float C = (float) (Math.pow(TimerRing.RING_CENTER_Y, 2) - Math.pow(TimerRing.RING_RADIUS, 2) +
+                    Math.pow(TimerRing.RING_CENTER_X, 2) - (2 * b * TimerRing.RING_CENTER_Y) + Math.pow(b, 2));
+            if (x < TimerRing.RING_CENTER_X) {
                 intersectionX = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
                 intersectionY = (int) ((m * ((-B - Math.sqrt(Math.pow(B, 2) -
                                             (4 * A * C))) / (2 * A))) + b);
@@ -342,12 +357,12 @@ public class TimerView extends View {
     }
 
     private boolean isPointOnRing(float x, float y) {
-        double temp = Math.pow((x - mRingX), 2) + Math.pow(y - mRingY, 2);
+        double temp = Math.pow((x - TimerRing.RING_CENTER_X), 2) + Math.pow(y - TimerRing.RING_CENTER_Y, 2);
         // NOTE: the stroke is centered around the object's perimeter
         // check that touch is on the ring's stroke: coordinates are within outer circle and
         // outside of inner circle
-        if (temp < Math.pow((mRingRadius + (mRingWidth / 2)), 2) &&
-                temp > Math.pow((mRingRadius - (mRingWidth / 2)), 2)) {
+        if (temp < Math.pow((TimerRing.RING_RADIUS + (TimerRing.RING_STROKE_WIDTH / 2)), 2) &&
+                temp > Math.pow((TimerRing.RING_RADIUS - (TimerRing.RING_STROKE_WIDTH / 2)), 2)) {
             return true;
         }
         return false;
