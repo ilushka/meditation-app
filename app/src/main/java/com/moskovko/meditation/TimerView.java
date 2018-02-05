@@ -6,12 +6,15 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Created by ilushka on 9/18/17.
@@ -20,17 +23,25 @@ import java.util.ArrayList;
 public class TimerView extends View {
     private static final String TAG = "TimerView";
 
-    private static final int MARK_WIDTH = 100;
-    private static final int MARK_HEIGHT = 200;
-    private static final int TEXT_SIZE = 150;
+    private static final int MARK_WIDTH         = 100;
+    private static final int MARK_HEIGHT        = 200;
+    private static final int TEXT_SIZE          = 150;
+    private static final int TIMER_INTERVAL     = 50;
 
     private Paint mBarBackgroundPaint;
     private Paint mRingColor;
     private Paint mTextPaint;
+    private Paint mArcPaint;
     private Rect mViewRect;
+    private RectF mRingRect;
     private float mRingX, mRingY, mRingRadius, mRingWidth;
     private ArrayList<TimerMark> mTimerMarks;
     private TimerMark mPendingMark = null;
+    private Timer mTimer;
+    private TimerTask mTask;
+    private boolean mIsRunning;
+    private float mStartAngle, mSweepAngle;
+    private float mCurrentMs, mFinalMs;
 
     private class TimerMark {
         public float degrees, radius;
@@ -87,6 +98,11 @@ public class TimerView extends View {
         mRingY = 0;
         mRingRadius = 300;
         mRingWidth = 150;
+        mRingRect = new RectF((0 - (mRingRadius)), (0 - (mRingRadius)), ((mRingRadius)), ((mRingRadius)));
+        mStartAngle = 0;
+        mSweepAngle = 0;
+        mCurrentMs = 0;
+        mFinalMs = 60000;
 
 
         /*
@@ -136,6 +152,11 @@ public class TimerView extends View {
         mTextPaint.setStyle(Paint.Style.FILL);
         mTextPaint.setTextSize(TEXT_SIZE);
 
+        mArcPaint = new Paint();
+        mArcPaint.setColor(Color.BLUE);
+        mArcPaint.setStyle(Paint.Style.STROKE);
+        mArcPaint.setStrokeWidth(mRingWidth + 5);
+
         /*
         mBarForegroundPaint = new Paint();
         mBarForegroundPaint.setColor(mForegroundColor);
@@ -156,6 +177,21 @@ public class TimerView extends View {
         */
 
         mTimerMarks = new ArrayList<TimerMark>();
+
+        mTimer = new Timer();
+        mTask = new TimerTask() {
+            @Override
+            public void run() {
+                mCurrentMs += TIMER_INTERVAL;
+                mSweepAngle = (mCurrentMs / mFinalMs) * 360;
+                TimerView.this.postInvalidate();
+                if (mCurrentMs >= mFinalMs) {
+                    mTimer.cancel();
+                }
+            }
+        };
+
+        mIsRunning = false;
     }
 
     /*
@@ -209,10 +245,16 @@ public class TimerView extends View {
         canvas.drawRect(mViewRect, mBarBackgroundPaint);
 
         canvas.save();
-
-        // draw main ring
         canvas.translate(mViewRect.centerX(), mViewRect.centerY());
+
+        canvas.save();
+        canvas.rotate(-90, 0, 0);
+        // draw main ring
         canvas.drawCircle(mRingX, mRingY, mRingRadius, mRingColor);
+        // MONKEY:
+        canvas.drawArc(mRingRect, mStartAngle, mSweepAngle, false, mArcPaint);
+        canvas.restore();
+
         // draw already placed marks
         for (TimerMark tp : mTimerMarks) {
             canvas.save(Canvas.MATRIX_SAVE_FLAG);
@@ -334,5 +376,19 @@ public class TimerView extends View {
     public void clearTimerPoints() {
         mTimerMarks.clear();
         invalidate();
+    }
+
+    public boolean isRunning() {
+        return mIsRunning;
+    }
+
+    public void start() {
+        mTimer.schedule(mTask, 0, TIMER_INTERVAL);
+        mIsRunning = true;
+    }
+
+    public void stop() {
+        mTimer.cancel();
+        mIsRunning = false;
     }
 }
