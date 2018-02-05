@@ -58,11 +58,6 @@ public class TimerView extends View {
         private Paint mPaint;
 
         public TimerMark(Point center, int height, int width) {
-            /* MONKEY:
-            this.mCenter = new Point(center);
-            this.mAngle = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
-            this.mRect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
-            */
             this.setCenterPoint(center);
             this.mHeight = height;
             this.mWidth = width;
@@ -119,8 +114,8 @@ public class TimerView extends View {
         private RectF mRect;
         private float mRadius;
 
-        public TimerRing(RectF rect, float radius) {
-            this.mRect = rect;
+        public TimerRing(float radius) {
+            this.mRect = new RectF((0 - radius), (0 - radius), radius, radius);
             this.mRadius = radius;
             this.mArcPaint = new Paint();
             this.mArcPaint.setColor(Color.BLUE);
@@ -273,12 +268,10 @@ public class TimerView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        float radius;
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
-        if (width < height) radius = (width / 2) - TimerRing.RING_STROKE_WIDTH;
-        else radius = (height / 2) - TimerRing.RING_STROKE_WIDTH;
-        mTimerRing = new TimerRing(new RectF((0 - radius), (0 - radius), radius, radius), radius);
+        if (width < height) mTimerRing = new TimerRing((width / 2) - TimerRing.RING_STROKE_WIDTH);
+        else mTimerRing = new TimerRing((height / 2) - TimerRing.RING_STROKE_WIDTH);
         mViewRect = new Rect(0, 0, width, height);
         setMeasuredDimension(mViewRect.width(), mViewRect.height());
     }
