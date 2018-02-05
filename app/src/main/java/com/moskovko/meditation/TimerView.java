@@ -112,15 +112,16 @@ public class TimerView extends View {
     private class TimerRing {
         public static final float RING_CENTER_X         = 0;
         public static final float RING_CENTER_Y         = 0;
-        public static final float RING_RADIUS           = 300;
         public static final float RING_STROKE_WIDTH     = 150;
 
         private Paint mRingPaint;
         private Paint mArcPaint;
         private RectF mRect;
+        private float mRadius;
 
-        public TimerRing(RectF rect) {
+        public TimerRing(RectF rect, float radius) {
             this.mRect = rect;
+            this.mRadius = radius;
             this.mArcPaint = new Paint();
             this.mArcPaint.setColor(Color.BLUE);
             this.mArcPaint.setStyle(Paint.Style.STROKE);
@@ -134,6 +135,7 @@ public class TimerView extends View {
         public RectF getRect()      { return this.mRect; }
         public Paint getArcPaint()  { return this.mArcPaint; }
         public Paint getRingPaint() { return this.mRingPaint; }
+        public float getRadius()    { return this.mRadius; }
     }
 
     public TimerView(Context context, AttributeSet attrs) {
@@ -183,8 +185,6 @@ public class TimerView extends View {
         mTextPaint.setStyle(Paint.Style.FILL);
         mTextPaint.setTextSize(TEXT_SIZE);
 
-        RectF ringRect = new RectF((0 - (TimerRing.RING_RADIUS)), (0 - (TimerRing.RING_RADIUS)), TimerRing.RING_RADIUS, TimerRing.RING_RADIUS);
-        mTimerRing = new TimerRing(ringRect);
         mStartAngle = 0;
         mSweepAngle = 0;
         mCurrentMs = 0;
@@ -273,8 +273,12 @@ public class TimerView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        float radius;
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
+        if (width < height) radius = (width / 2) - TimerRing.RING_STROKE_WIDTH;
+        else radius = (height / 2) - TimerRing.RING_STROKE_WIDTH;
+        mTimerRing = new TimerRing(new RectF((0 - radius), (0 - radius), radius, radius), radius);
         mViewRect = new Rect(0, 0, width, height);
         setMeasuredDimension(mViewRect.width(), mViewRect.height());
     }
@@ -291,7 +295,7 @@ public class TimerView extends View {
         canvas.save();
         canvas.rotate(-90, 0, 0);
         // draw main ring
-        canvas.drawCircle(TimerRing.RING_CENTER_X, TimerRing.RING_CENTER_Y, TimerRing.RING_RADIUS,
+        canvas.drawCircle(TimerRing.RING_CENTER_X, TimerRing.RING_CENTER_Y, mTimerRing.getRadius(),
                                 mTimerRing.getRingPaint());
         // draw arc mask
         canvas.drawArc(mTimerRing.getRect(), mStartAngle, mSweepAngle, false,
@@ -327,7 +331,7 @@ public class TimerView extends View {
             float A = 1;
             float B = -2 * TimerRing.RING_CENTER_Y;
             float C = (float)(Math.pow(TimerRing.RING_CENTER_Y, 2) -
-                                    Math.pow(TimerRing.RING_RADIUS, 2));
+                                    Math.pow(mTimerRing.getRadius(), 2));
             if (y < TimerRing.RING_CENTER_Y) {
                 intersectionX = x;
                 intersectionY = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
@@ -341,7 +345,7 @@ public class TimerView extends View {
             // https://math.stackexchange.com/questions/228841/how-do-i-calculate-the-intersections-of-a-straight-line-and-a-circle
             float A = (float) (Math.pow(m, 2) + 1);
             float B = (float) (2 * ((m * b) - (m * TimerRing.RING_CENTER_Y) - TimerRing.RING_CENTER_X));
-            float C = (float) (Math.pow(TimerRing.RING_CENTER_Y, 2) - Math.pow(TimerRing.RING_RADIUS, 2) +
+            float C = (float) (Math.pow(TimerRing.RING_CENTER_Y, 2) - Math.pow(mTimerRing.getRadius(), 2) +
                     Math.pow(TimerRing.RING_CENTER_X, 2) - (2 * b * TimerRing.RING_CENTER_Y) + Math.pow(b, 2));
             if (x < TimerRing.RING_CENTER_X) {
                 intersectionX = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
@@ -361,8 +365,8 @@ public class TimerView extends View {
         // NOTE: the stroke is centered around the object's perimeter
         // check that touch is on the ring's stroke: coordinates are within outer circle and
         // outside of inner circle
-        if (temp < Math.pow((TimerRing.RING_RADIUS + (TimerRing.RING_STROKE_WIDTH / 2)), 2) &&
-                temp > Math.pow((TimerRing.RING_RADIUS - (TimerRing.RING_STROKE_WIDTH / 2)), 2)) {
+        if (temp < Math.pow((mTimerRing.getRadius() + (TimerRing.RING_STROKE_WIDTH / 2)), 2) &&
+                temp > Math.pow((mTimerRing.getRadius() - (TimerRing.RING_STROKE_WIDTH / 2)), 2)) {
             return true;
         }
         return false;
