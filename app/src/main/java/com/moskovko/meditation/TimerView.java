@@ -13,6 +13,8 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -43,46 +45,65 @@ public class TimerView extends View {
     private float mStartAngle, mSweepAngle;
     private float mCurrentMs, mFinalMs;
 
-    private class TimerMark {
-        public float degrees, radius;
-        public Rect rect;
-        public Point center;
-        public Paint paint;
+    private class TimeMarkComparator implements Comparator<TimerMark> {
+        public int compare(TimerMark a, TimerMark b) {
+            if (a.getArcPosition() < b.getArcPosition()) return -1;
+            else if (a.getArcPosition() == b.getArcPosition()) return 0;
+            else return 1;
+        }
+    }
 
-        private int height, width;
+    private class TimerMark {
+        public float mAngle, mRadius, mArcPosition;
+        private int mHeight, mWidth;
+        public Rect mRect;
+        public Point mCenter;
+        private Paint mPaint;
 
         public TimerMark(Point center, int height, int width) {
-            this.center = new Point(center);
-            this.degrees = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
-            this.rect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
-            this.height = height;
-            this.width = width;
-            this.radius = height / 2;
-
-            this.paint = new Paint();
-            this.paint.setColor(Color.GREEN);
-            this.paint.setStyle(Paint.Style.FILL);
+            /* MONKEY:
+            this.mCenter = new Point(center);
+            this.mAngle = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
+            this.mRect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
+            */
+            this.setCenterPoint(center);
+            this.mHeight = height;
+            this.mWidth = width;
+            this.mRadius = height / 2;
+            this.mPaint = new Paint();
+            this.mPaint.setColor(Color.GREEN);
+            this.mPaint.setStyle(Paint.Style.FILL);
         }
 
-        public void setPoint(Point newCenter) {
-            this.center = new Point(newCenter);
-            this.rect = new Rect(center.x - (width / 2), center.y - (height / 2), center.x + (width / 2), center.y + (height / 2));
-            this.degrees = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - newCenter.y)), (mRingX - newCenter.x)));
+        public void setCenterPoint(Point newCenter) {
+            this.mCenter = new Point(newCenter);
+            this.mRect = new Rect(mCenter.x - (mWidth / 2), mCenter.y - (mHeight / 2), mCenter.x + (mWidth / 2), mCenter.y + (mHeight / 2));
+            this.mAngle = 0 - (float)Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - newCenter.y)), (mRingX - newCenter.x)));
+            setArcPosition();
         }
 
-        public float getPositionPercentage() {
-            double degrees = Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - center.y)), (mRingX - center.x)));
+        private void setArcPosition() {
+            double degrees = Math.toDegrees(Math.atan2(((0 - mRingY) - (0 - mCenter.y)),
+                                        (mRingX - mCenter.x)));
             if (degrees <= -90 && degrees >= -180) {
-                return (float)((Math.abs(degrees) - 90) / 360);
+                this.mArcPosition = (float)((Math.abs(degrees) - 90) / 360);
             } else if (degrees <= 180 && degrees >= 90) {
-                return (float)(((180 - degrees) / 360) + 0.25);
+                this.mArcPosition = (float)(((180 - degrees) / 360) + 0.25);
             } else if (degrees < 90 && degrees >= 0) {
-                return (float)(((90 - degrees) / 360) + 0.50);
+                this.mArcPosition = (float)(((90 - degrees) / 360) + 0.50);
             } else {
-                return (float)(((Math.abs(degrees)) / 360) + 0.75);
+                this.mArcPosition = (float)(((Math.abs(degrees)) / 360) + 0.75);
             }
         }
 
+        public Paint getPaint()         { return this.mPaint; }
+        public Point getCenter()        { return this.mCenter; }
+        public Rect getRect()           { return this.mRect; }
+        public float getRadius()        { return this.mRadius; }
+        public float getAngle()         { return this.mAngle; }
+        public float getArcPosition()   { return this.mArcPosition; }
+
+        @Override
         public boolean equals(Object obj) {
             if (obj == this) {
                 return true;
@@ -98,7 +119,7 @@ public class TimerView extends View {
         mRingY = 0;
         mRingRadius = 300;
         mRingWidth = 150;
-        mRingRect = new RectF((0 - (mRingRadius)), (0 - (mRingRadius)), ((mRingRadius)), ((mRingRadius)));
+        mRingRect = new RectF((0 - (mRingRadius)), (0 - (mRingRadius)), mRingRadius, mRingRadius);
         mStartAngle = 0;
         mSweepAngle = 0;
         mCurrentMs = 0;
@@ -137,7 +158,7 @@ public class TimerView extends View {
         }
         */
 
-        // paint
+        // mPaint
         mRingColor = new Paint();
         mRingColor.setColor(Color.RED);
         mRingColor.setStyle(Paint.Style.STROKE);
@@ -183,7 +204,15 @@ public class TimerView extends View {
             @Override
             public void run() {
                 mCurrentMs += TIMER_INTERVAL;
-                mSweepAngle = (mCurrentMs / mFinalMs) * 360;
+                float timePosition = mCurrentMs / mFinalMs;
+                if (mTimerMarks.size() > 0) {
+                    TimerMark mark = mTimerMarks.get(0);
+                    if (timePosition >= mark.getArcPosition()) {
+                        Log.d("MONKEY", "timer event");
+                        mTimerMarks.remove(mark);
+                    }
+                }
+                mSweepAngle = timePosition * 360;
                 TimerView.this.postInvalidate();
                 if (mCurrentMs >= mFinalMs) {
                     mTimer.cancel();
@@ -214,13 +243,13 @@ public class TimerView extends View {
         // calculate offset that is subtracted from size representing 100%
         int widthOffset = 0, heightOffset = 0;
         if (mIsHorizontal) {
-            widthOffset = (int)(mBackgroundBarRect.width() * (1 - mCurrentChargeLevel));
+            widthOffset = (int)(mBackgroundBarRect.mWidth() * (1 - mCurrentChargeLevel));
         } else {
-            heightOffset = (int)(mBackgroundBarRect.height() * (1 - mCurrentChargeLevel));
+            heightOffset = (int)(mBackgroundBarRect.mHeight() * (1 - mCurrentChargeLevel));
         }
         // update the rectangle of the bar
-        mForegroundBarRect.set(0, 0, mBackgroundBarRect.width() - widthOffset,
-                mBackgroundBarRect.height() - heightOffset);
+        mForegroundBarRect.set(0, 0, mBackgroundBarRect.mWidth() - widthOffset,
+                mBackgroundBarRect.mHeight() - heightOffset);
 
         mText = Integer.toString((int)(mScaledValue * mCurrentChargeLevel)) + mTexUnit;
 
@@ -251,25 +280,26 @@ public class TimerView extends View {
         canvas.rotate(-90, 0, 0);
         // draw main ring
         canvas.drawCircle(mRingX, mRingY, mRingRadius, mRingColor);
-        // MONKEY:
+        // draw arc mask
         canvas.drawArc(mRingRect, mStartAngle, mSweepAngle, false, mArcPaint);
         canvas.restore();
 
         // draw already placed marks
         for (TimerMark tp : mTimerMarks) {
             canvas.save(Canvas.MATRIX_SAVE_FLAG);
-            canvas.rotate(tp.degrees, tp.center.x, tp.center.y);
-            canvas.drawRect(tp.rect, tp.paint);
+            canvas.rotate(tp.getAngle(), tp.getCenter().x, tp.getCenter().y);
+            canvas.drawRect(tp.getRect(), tp.getPaint());
             canvas.restore();
         }
         // draw currently dragged mark
         if (mPendingMark != null) {
             canvas.save(Canvas.MATRIX_SAVE_FLAG);
-            canvas.rotate(mPendingMark.degrees, mPendingMark.center.x, mPendingMark.center.y);
-            canvas.drawRect(mPendingMark.rect, mPendingMark.paint);
+            canvas.rotate(mPendingMark.getAngle(), mPendingMark.getCenter().x,
+                                mPendingMark.getCenter().y);
+            canvas.drawRect(mPendingMark.getRect(), mPendingMark.getPaint());
             canvas.restore();
-            // draw center text
-            String text =  Integer.toString(Math.round(mPendingMark.getPositionPercentage() * 100));
+            // draw text
+            String text =  Integer.toString(Math.round(mPendingMark.getArcPosition() * 100));
             canvas.drawText(text, 0, text.length(), (0 - (TEXT_SIZE / 2)), 0, mTextPaint);
         }
 
@@ -296,13 +326,16 @@ public class TimerView extends View {
             // https://math.stackexchange.com/questions/228841/how-do-i-calculate-the-intersections-of-a-straight-line-and-a-circle
             float A = (float) (Math.pow(m, 2) + 1);
             float B = (float) (2 * ((m * b) - (m * mRingY) - mRingX));
-            float C = (float) (Math.pow(mRingY, 2) - Math.pow(mRingRadius, 2) + Math.pow(mRingX, 2) - (2 * b * mRingY) + Math.pow(b, 2));
+            float C = (float) (Math.pow(mRingY, 2) - Math.pow(mRingRadius, 2) +
+                    Math.pow(mRingX, 2) - (2 * b * mRingY) + Math.pow(b, 2));
             if (x < mRingX) {
                 intersectionX = (int) ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
-                intersectionY = (int) ((m * ((-B - Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A))) + b);
+                intersectionY = (int) ((m * ((-B - Math.sqrt(Math.pow(B, 2) -
+                                            (4 * A * C))) / (2 * A))) + b);
             } else {
                 intersectionX = (int) ((-B + Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A));
-                intersectionY = (int) ((m * ((-B + Math.sqrt(Math.pow(B, 2) - (4 * A * C))) / (2 * A))) + b);
+                intersectionY = (int) ((m * ((-B + Math.sqrt(Math.pow(B, 2) -
+                                            (4 * A * C))) / (2 * A))) + b);
             }
         }
         return new Point(intersectionX, intersectionY);
@@ -321,8 +354,8 @@ public class TimerView extends View {
     }
 
     private boolean isPointInTimerMark(float x, float y, TimerMark mark) {
-        double temp = Math.pow((x - mark.center.x), 2) + Math.pow(y - mark.center.y, 2);
-        if (temp < Math.pow(mark.radius, 2)) {
+        double temp = Math.pow((x - mark.mCenter.x), 2) + Math.pow(y - mark.mCenter.y, 2);
+        if (temp < Math.pow(mark.getRadius(), 2)) {
             return true;
         }
         return false;
@@ -358,13 +391,14 @@ public class TimerView extends View {
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (mPendingMark != null) {
-                    mPendingMark.setPoint(snapPoint);
+                    mPendingMark.setCenterPoint(snapPoint);
                 }
                 invalidate();
                 break;
             case MotionEvent.ACTION_UP:
                 if (mPendingMark != null) {
                     mTimerMarks.add(mPendingMark);
+                    Collections.sort(mTimerMarks, new TimeMarkComparator());
                     mPendingMark = null;
                 }
                 invalidate();
