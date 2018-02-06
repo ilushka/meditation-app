@@ -29,8 +29,7 @@ public class TimerView extends View {
     private static final int MARK_HEIGHT        = 200;
     private static final int TEXT_SIZE          = 150;
     private static final int TIMER_INTERVAL     = 50;
-
-    private Paint mBarBackgroundPaint;
+    
     private Paint mTextPaint;
     private Rect mViewRect;
     private ArrayList<TimerMark> mTimerMarks;
@@ -170,11 +169,6 @@ public class TimerView extends View {
         }
         */
 
-
-        mBarBackgroundPaint = new Paint();
-        mBarBackgroundPaint.setColor(Color.BLUE);
-        mBarBackgroundPaint.setStyle(Paint.Style.FILL);
-
         mTextPaint = new Paint();
         mTextPaint.setColor(Color.WHITE);
         mTextPaint.setStyle(Paint.Style.FILL);
@@ -279,8 +273,6 @@ public class TimerView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         // TODO: don't do any calculations here!!!!
-
-        canvas.drawRect(mViewRect, mBarBackgroundPaint);
 
         canvas.save();
         canvas.translate(mViewRect.centerX(), mViewRect.centerY());
