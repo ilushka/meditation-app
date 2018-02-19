@@ -1,6 +1,7 @@
 package com.moskovko.meditation;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -40,6 +41,7 @@ public class TimerView extends View {
     private float mStartAngle, mSweepAngle;
     private float mCurrentMs, mFinalMs;
     private TimerRing mTimerRing;
+    private int mTimerRingColor, mTimerArcColor;
 
     private class TimeMarkComparator implements Comparator<TimerMark> {
         public int compare(TimerMark a, TimerMark b) {
@@ -126,6 +128,17 @@ public class TimerView extends View {
             this.mRingPaint.setStrokeWidth(TimerRing.RING_STROKE_WIDTH);
         }
 
+        public TimerRing(float radius, int ringColor) {
+            this(radius);
+            this.mRingPaint.setColor(ringColor);
+        }
+
+        public TimerRing(float radius, int ringColor, int arcColor) {
+            this(radius);
+            this.mRingPaint.setColor(ringColor);
+            this.mArcPaint.setColor(arcColor);
+        }
+
         public RectF getRect()      { return this.mRect; }
         public Paint getArcPaint()  { return this.mArcPaint; }
         public Paint getRingPaint() { return this.mRingPaint; }
@@ -135,39 +148,19 @@ public class TimerView extends View {
     public TimerView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-
-
-        /*
         // load custom attributes from the xml file
         TypedArray a = context.getTheme().obtainStyledAttributes(
                 attrs,
                 R.styleable.TimerView,
                 0, 0);
         try {
-            mForegroundColor = a.getColor(R.styleable.BatteryChargeView_foregroundColor,
-                    Color.parseColor("#000000"));
-            mBackgroundColor = a.getColor(R.styleable.BatteryChargeView_backgroundColor,
+            mTimerRingColor = a.getColor(R.styleable.TimerView_ringColor,
+                        Color.parseColor("#FFFFFF"));
+            mTimerArcColor = a.getColor(R.styleable.TimerView_arcColor,
                     Color.parseColor("#FFFFFF"));
-
-            String orientation = a.getString(R.styleable.BatteryChargeView_orientation);
-            if (orientation.equals("horizontal")) {
-                mIsHorizontal = true;
-            } else {
-                mIsHorizontal = false;
-            }
-
-            String units = a.getString(R.styleable.BatteryChargeView_units);
-            if (units.equals("amperehour")) {
-                mTexUnit = AMPEREHOUR;
-            } else if (units.equals("percentage")) {
-                mTexUnit = PERCENTAGE;
-            }
-
-            mScaledValue = a.getInt(R.styleable.BatteryChargeView_scaledValue, 100);
         } finally {
             a.recycle();
         }
-        */
 
         mTextPaint = new Paint();
         mTextPaint.setColor(Color.WHITE);
@@ -264,8 +257,10 @@ public class TimerView extends View {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
-        if (width < height) mTimerRing = new TimerRing((width / 2) - TimerRing.RING_STROKE_WIDTH);
-        else mTimerRing = new TimerRing((height / 2) - TimerRing.RING_STROKE_WIDTH);
+        if (width < height) mTimerRing = new TimerRing((width / 2) - TimerRing.RING_STROKE_WIDTH,
+                                                    mTimerRingColor, mTimerArcColor);
+        else mTimerRing = new TimerRing((height / 2) - TimerRing.RING_STROKE_WIDTH,
+                                                    mTimerRingColor, mTimerArcColor);
         mViewRect = new Rect(0, 0, width, height);
         setMeasuredDimension(mViewRect.width(), mViewRect.height());
     }
