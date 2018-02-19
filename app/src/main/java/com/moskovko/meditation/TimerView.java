@@ -29,7 +29,7 @@ public class TimerView extends View {
     private static final int MARK_HEIGHT        = 200;
     private static final int TEXT_SIZE          = 150;
     private static final int TIMER_INTERVAL     = 50;
-    
+
     private Paint mTextPaint;
     private Rect mViewRect;
     private ArrayList<TimerMark> mTimerMarks;
